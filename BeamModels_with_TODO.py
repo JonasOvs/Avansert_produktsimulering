@@ -3,7 +3,7 @@
 # PURPOSE
 #  Starting point for a couple of beam models
 #
-
+#TEST1
 import math
 import numpy as np
 import matplotlib.pyplot as plt
@@ -47,7 +47,7 @@ class BeamModel:
             ey = np.array([self.coords[inod1,1],self.coords[inod2,1]])
             Ke = CorotBeam.beam2e(ex, ey, self.ep) #TODO use updated routine here
             Edofs = self.Edofs[iel] - 1
-            K_sys[np.ix_(Edofs,Edofs)] += Ke #dicks
+            K_sys[np.ix_(Edofs,Edofs)] += Ke
 
         # Set boundary conditions
         for idof in range(len(self.bc)):
