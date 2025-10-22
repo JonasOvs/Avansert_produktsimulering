@@ -1,9 +1,3 @@
-# -*- coding: utf-8 -*-
-"""
-Created on Fri Oct 19 16:43:51 2018
-
-@author: bjohau
-"""
 
 import numpy as np
 import math
@@ -21,167 +15,108 @@ def rot_matrix(theta):
     return R
 
 def beam2local_def_disp(ex,ey, disp_global):
-import numpy as np
-import math
-
-def beam2local_def_disp(ex, ey, disp_global):
-    """
-    Transform global nodal displacements to local displacements
-    relative to the deformed configuration (corotational formulation).
-
-    :param ex: element x coordinates [x1, x2]
-    :param ey: element y coordinates [y1, y2]
-    :param disp_global: displacement vector [u1, v1, r1, u2, v2, r2]
-    :return: def_disp_local: displacement vector [u1, v1, r1, u2, v2, r2] in local directions
     """
 
-    # --- Undeformed geometry ---
+    :param ex: element x coordinate [x1, x2] in undeformed position
+    :param ey: element y coordinate [y1, y2] in undeformed position
+    :param disp_global:  displacement vector [u1, v1, r1, u2, v2, r2] in global directions
+    :return: disp_local_def: displacement vector [u1, v1, r1, u2, v2, r2] in local directions
+    """
     eVec12 = np.array([ex[1] - ex[0], ey[1] - ey[0]])
     L0 = math.sqrt(eVec12 @ eVec12)
 
-    # --- Deformed coordinates ---
+    #Ld = L0 #TODO: correct this, fikset jonas
+    # Calculate deformed positions
     x1_def = ex[0] + disp_global[0]
     y1_def = ey[0] + disp_global[1]
     x2_def = ex[1] + disp_global[3]
     y2_def = ey[1] + disp_global[4]
+    
+    # Calculate deformed length
+    eVec12_def = np.array([x2_def - x1_def, y2_def - y1_def])
+    Ld = math.sqrt(eVec12_def @ eVec12_def)
 
-    # --- Deformed length ---
-    eVec_def = np.array([x2_def - x1_def, y2_def - y1_def])
-    Ld = math.sqrt(eVec_def @ eVec_def)
+    # TODO: Quite a bit here, fikset jonas
+    theta_def = math.atan2(eVec12_def[1], eVec12_def[0])
 
-    # --- Orientation angles (global x-axis to element axis) ---
-    alpha0 = math.atan2(eVec12[1], eVec12[0])      # initial
-    alphad = math.atan2(eVec_def[1], eVec_def[0])  # deformed
-    dAlpha = alphad - alpha0                       # rigid-body rotation of the element
+    r1 = disp_global[2]
+    r2 = disp_global[5]
 
-    # --- Compute local displacements ---
-    # Transformation matrix from global to local (initial configuration)
-    T0 = np.array([
-        [ math.cos(alpha0),  math.sin(alpha0), 0, 0, 0, 0],
-        [-math.sin(alpha0),  math.cos(alpha0), 0, 0, 0, 0],
-        [ 0, 0, 1, 0, 0, 0],
-        [ 0, 0, 0, math.cos(alpha0),  math.sin(alpha0), 0],
-        [ 0, 0, 0,-math.sin(alpha0),  math.cos(alpha0), 0],
-        [ 0, 0, 0, 0, 0, 1]
-    ])
+    theta1_def = r1 - theta_def
+    theta2_def = r2 - theta_def
 
-    disp_local_init = T0 @ disp_global
+    # theta1_def = 0.0  # TODO: correct this
+    # theta2_def = 0.0  # TODO: correct this
 
-    # --- Local rotations relative to the deformed axis ---
-    # r1 and r2 are nodal rotations in global coordinates.
-    r1_global = disp_global[2]
-    r2_global = disp_global[5]
+    def_disp_local = np.array([ -0.5*(Ld - L0),
+                                0.0,
+                                theta1_def,
+                                0.5 * (Ld - L0),
+                                0.0,
+                                theta2_def])
 
-    # Subtract rigid-body rotation (dAlpha) to get relative bending rotations
-    theta1_def = r1_global - dAlpha
-    theta2_def = r2_global - dAlpha
-
-    # --- Define local displacement vector in deformed configuration ---
-    def_disp_local = np.array([
-        -0.5 * (Ld - L0),
-         0.0,
-         theta1_def,
-         0.5 * (Ld - L0),
-         0.0,
-         theta2_def
-    ])
-
+    # print("theta_def:", theta_def)
+    # print("theta1_def:", theta1_def)
+    # print("theta2_def:", theta2_def)
     return def_disp_local
 
-
-
-def beam2corot_Ke_and_Fe(ex,ey,ep, disp_global):
-    """
-    Compute the stiffness matrix and internal forces for a two dimensional beam element
-    relative to deformed configuration.
-    
-    :param list ex: element x coordinates [x1, x2]
-    :param list ey: element y coordinates [y1, y2]
-    :param list ep: element properties [E, A, I], E - Young's modulus, A - Cross section area, I - Moment of inertia
-    :param list disp_global displacement vector for the element [tx1,ty1,rz1,tx2,ty2,rz2]
-
-
-    :return mat Ke_global: element stiffness matrix [6 x 6]
-    :return mat fe_int_global: element internal forces [6 x 1]
-    """
-    # Undeformed length and unit vector along element
-    import numpy as np
-import math
-
+#     return Ke_global, fe_int_global
 def beam2corot_Ke_and_Fe(ex, ey, ep, disp_global):
     """
-    Compute the stiffness matrix and internal forces for a 2D corotational beam element.
-    
-    :param list ex: element x coordinates [x1, x2]
-    :param list ey: element y coordinates [y1, y2]
-    :param list ep: element properties [E, A, I]
-    :param list disp_global: displacement vector [ux1, uy1, rz1, ux2, uy2, rz2]
+    Compute the stiffness matrix and internal forces for a 2D beam element 
+    using a simplified corotational approach (linear Euler-Bernoulli).
+
+    :param ex: [x1, x2] element x coordinates
+    :param ey: [y1, y2] element y coordinates
+    :param ep: [E, A, I] element properties
+    :param disp_global: [tx1, ty1, rz1, tx2, ty2, rz2] displacement vector
+
     :return: Ke_global (6x6), fe_int_global (6,)
     """
+
     E, A, I = ep
 
-    # --- Undeformed geometry ---
-    eVec12 = np.array([ex[1] - ex[0], ey[1] - ey[0]])
-    L0 = np.sqrt(eVec12 @ eVec12)
-    nx0, ny0 = eVec12 / L0
+    # Element length
+    dx = ex[1] - ex[0]
+    dy = ey[1] - ey[0]
+    L0 = np.sqrt(dx**2 + dy**2)
+    exvec0 = np.array([dx/L0, dy/L0])
 
-    # --- Deformed geometry ---
-    x1_def = ex[0] + disp_global[0]
-    y1_def = ey[0] + disp_global[1]
-    x2_def = ex[1] + disp_global[3]
-    y2_def = ey[1] + disp_global[4]
+    ex_def = ex + [disp_global[0],disp_global[3]]
+    ey_def = ey + [disp_global[1],disp_global[4]]
+    dx_def = ex_def[1] - ex_def[0]
+    dy_def = ey_def[1] - ey_def[0]
+    Ld = np.sqrt(dx_def**2 + dy_def**2)   
+    exvecD = np.array([dx_def/Ld, dy_def/Ld])
+    eyvecD = np.array([-exvecD[1],exvecD[0]])
 
-    eVec_def = np.array([x2_def - x1_def, y2_def - y1_def])
-    L = np.sqrt(eVec_def @ eVec_def)
-    nx, ny = eVec_def / L
+    displ_local = np.zeros(6)
 
-    # --- Rotation from global to local (current configuration) ---
-    T_rot = np.array([
-        [nx, ny, 0,   0,  0, 0],
-        [-ny, nx, 0,  0,  0, 0],
-        [0, 0, 1,     0,  0, 0],
-        [0, 0, 0,    nx, ny, 0],
-        [0, 0, 0,   -ny, nx, 0],
-        [0, 0, 0,     0,  0, 1]
-    ])
+    for i in range(2):
+        R = rot_matrix(disp_global[i*3+2])
+        tvec = R @ exvec0
+        theta_d = math.asin(eyvecD.dot(tvec))
+        displ_local[i*3+2] = theta_d
+        
+    delta_L = Ld - L0
 
-    # --- Local displacements ---
-    disp_local = T_rot @ disp_global
+    displ_local[0] = -delta_L *0.5
+    displ_local[3] = delta_L * 0.5
 
-    # Local displacements: [u1, v1, θ1, u2, v2, θ2]
-    u1, v1, th1, u2, v2, th2 = disp_local
+    Ke_local = beam2local_stiff(L0,ep)
+    f_int_local = Ke_local @ displ_local
 
-    # --- Axial deformation ---
-    du = u2 - u1
-    axial_strain = (L - L0) / L0
-    N = E * A * axial_strain  # axial force
 
-    # --- Local internal forces (Euler-Bernoulli beam) ---
-    kL = E * I / (L ** 3)
-    k_axial = E * A / L
+    # Blokk-diagonal transformasjon for 2D element (3x3 per node)
 
-    # Local tangent stiffness (linearized about current config)
-    Ke_local = np.array([
-        [ k_axial,    0,           0,   -k_axial,    0,           0],
-        [ 0,     12*kL,   6*L*kL,     0,  -12*kL,   6*L*kL],
-        [ 0,     6*L*kL,  4*L*L*kL,   0,  -6*L*kL,  2*L*L*kL],
-        [-k_axial,   0,           0,    k_axial,    0,           0],
-        [ 0,    -12*kL,  -6*L*kL,    0,   12*kL,  -6*L*kL],
-        [ 0,     6*L*kL,  2*L*L*kL,   0,  -6*L*kL,  4*L*L*kL]
-    ])
+    T = beam2corot_Te(ex_def,ey_def)
 
-    # Local internal force vector (axial + bending)
-    fe_int_local = Ke_local @ disp_local
-    fe_int_local[0] += N
-    fe_int_local[3] -= N
-
-    # --- Transform back to global coordinates ---
-    Ke_global = T_rot.T @ Ke_local @ T_rot
-    fe_int_global = T_rot.T @ fe_int_local
+    # Global stivhetsmatrise og interne krefter
+    Ke_global = T.T @ Ke_local @ T
+    f_int_local = Ke_local @ displ_local
+    fe_int_global = T.T @ f_int_local
 
     return Ke_global, fe_int_global
-
-
     
 def beam2corot_Te(ex,ey):
     """
