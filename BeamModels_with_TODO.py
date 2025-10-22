@@ -34,102 +34,63 @@ class BeamModel:
         self.load_history = []
         self.disp_history = []
 
-    # def get_K_sys(self, disp_sys):
-    #     # Build system stiffness matrix for the structure
-    #     K_sys = np.zeros((self.num_dofs,self.num_dofs))
-
-    #     for iel in range(self.num_elements):
-    #         inod1 = self.Enods[iel,0]-1
-    #         inod2 = self.Enods[iel,1]-1
-    #         ex1 = self.coords[inod1,0]
-    #         ex2 = self.coords[inod2,0]
-    #         ex = np.array([ex1,ex2])
-    #         ey = np.array([self.coords[inod1,1],self.coords[inod2,1]])
-
-    #         #  
-
-    #         Edofs  = self.Edofs[iel] - 1
-    #         disp_e = disp_sys[np.ix_(Edofs)]
-    #         Ke, _  = CorotBeam.beam2corot_Ke_and_Fe(ex, ey, self.ep, disp_e) #3 lines changed here 
-
-    #         K_sys[np.ix_(Edofs,Edofs)] += Ke
-
-    #     # Set boundary conditions
-    #     for idof in range(len(self.bc)):
-    #         idx = self.bc[idof] - 1
-    #         K_sys[idx,:]   = 0.0
-    #         K_sys[:,idx]   = 0.0
-    #         K_sys[idx,idx] = 1.0
-
-    #     return K_sys
-
     def get_K_sys(self, disp_sys):
-            # Build system stiffness matrix for the structure
-            K_sys = np.zeros((self.num_dofs,self.num_dofs))
+        # Build system stiffness matrix for the structure
+        K_sys = np.zeros((self.num_dofs,self.num_dofs))
 
-            for iel in range(self.num_elements):
-                inod1 = self.Enods[iel,0]-1
-                inod2 = self.Enods[iel,1]-1
-                ex1 = self.coords[inod1,0]
-                ex2 = self.coords[inod2,0]
-                ex = np.array([ex1,ex2])
-                ey = np.array([self.coords[inod1,1],self.coords[inod2,1]])
-                Edofs = self.Edofs[iel] - 1
-                disp_e = disp_sys[np.ix_(Edofs)]
-                Ke, _ = CorotBeam.beam2corot_Ke_and_Fe(ex, ey, self.ep, disp_e)
-                K_sys[np.ix_(Edofs,Edofs)] += Ke
+        for iel in range(self.num_elements):
+            inod1 = self.Enods[iel,0]-1
+            inod2 = self.Enods[iel,1]-1
+            ex1 = self.coords[inod1,0]
+            ex2 = self.coords[inod2,0]
+            ex = np.array([ex1,ex2])
+            ey = np.array([self.coords[inod1,1],self.coords[inod2,1]])
+            Edofs = self.Edofs[iel] - 1
+            #Ke = CorotBeam.beam2e(ex, ey, self.ep) #TODO use updated routine here
+            disp_global = disp_sys[Edofs]
+            Ke, fe_int_global = CorotBeam.beam2corot_Ke_and_Fe(ex, ey, self.ep, disp_global)
+            #Edofs = self.Edofs[iel] - 1
+            K_sys[np.ix_(Edofs,Edofs)] += Ke
 
-            # Set boundary conditions
-            for idof in range(len(self.bc)):
-                idx = self.bc[idof] - 1
-                K_sys[idx,:] = 0.0
-                K_sys[:,idx] = 0.0
-                K_sys[idx,idx] = 1.0
+        # Set boundary conditions
+        for idof in range(len(self.bc)):
+            idx = self.bc[idof] - 1
+            K_sys[idx,:]   = 0.0
+            K_sys[:,idx]   = 0.0
+            K_sys[idx,idx] = 1.0
+        #print(K_sys)
+        return K_sys
 
-            return K_sys
 
     def get_num_dofs(self):
         num_dofs = self.num_nodes * 3
         return num_dofs
 
-    # def get_internal_forces(self, disp_sys):
-    #     # Build system stiffness matrix for the structure
-    #     f_int_sys = np.zeros(self.num_dofs)
-
-    #     for iel in range(self.num_elements):
-    #         inod1 = self.Enods[iel,0]-1
-    #         inod2 = self.Enods[iel,1]-1
-    #         ex1 = self.coords[inod1,0]
-    #         ex2 = self.coords[inod2,0]
-    #         ex = np.array([ex1,ex2])
-    #         ey = np.array([self.coords[inod1,1],self.coords[inod2,1]])
-           
-    #         #Ke = CorotBeam.beam2e(ex, ey, self.ep)   #TODO something better here
-    #         #Edofs = self.Edofs[iel] - 1
-    #         #disp_e = disp_sys[np.ix_(Edofs)] # ix_ picks elements with indexes in Edofs
-    #         #f_int_e = Ke * disp_e   #TODO something better here
-
-    #         Edofs  = self.Edofs[iel] - 1
-    #         disp_e = disp_sys[np.ix_(Edofs)]
-    #         _, f_int_e = CorotBeam.beam2corot_Ke_and_Fe(ex, ey, self.ep, disp_e) #3 lines changed here
-
-    #         f_int_sys[np.ix_(Edofs)] += f_int_e 
-
-    #     return f_int_sys
-
     def get_internal_forces(self, disp_sys):
-        # build internal force vector
+        #interne krefter bygger på disp_sys og disp_sys bygger interne krefter
+        # Build system stiffness matrix for the structure
         f_int_sys = np.zeros(self.num_dofs)
 
         for iel in range(self.num_elements):
             inod1 = self.Enods[iel,0]-1
             inod2 = self.Enods[iel,1]-1
-            ex = np.array([self.coords[inod1,0],self.coords[inod2,0]])
+            ex1 = self.coords[inod1,0]
+            ex2 = self.coords[inod2,0]
+            ex = np.array([ex1,ex2])
             ey = np.array([self.coords[inod1,1],self.coords[inod2,1]])
+            #Ke = CorotBeam.beam2e(ex, ey, self.ep)   #TODO something better here
+            #Ke = np.zeros((6,6)) #Jonas fikset, men feil
             Edofs = self.Edofs[iel] - 1
             disp_e = disp_sys[np.ix_(Edofs)] # ix_ picks elements with indexes in Edofs
-            _, f_int_e = CorotBeam.beam2corot_Ke_and_Fe(ex, ey, self.ep, disp_e)
-            f_int_sys[np.ix_(Edofs)] += f_int_e
+            #disp_e = disp_sys[Edofs] #jonas ikke fikset
+            #f_int_e = Ke * disp_e   #TODO something better here
+            #f_int_e = Ke @ disp_e #Jonas fikset
+
+            #f_int_sys[np.ix_(Edofs)] += f_int_e Gammel
+            #f_int_sys[Edofs] += f_int_e #jonas ikke fikset hei
+            _, fe_int = CorotBeam.beam2corot_Ke_and_Fe(ex, ey, self.ep, disp_e)
+            
+            f_int_sys[Edofs] += fe_int
 
         return f_int_sys
 
@@ -139,10 +100,22 @@ class BeamModel:
     def get_external_load(self,loadFactor):
         return (self.inc_load * loadFactor)
 
-    def get_residual(self,loadFactor,disp_sys):
+    # def get_residual(self,loadFactor,disp_sys):
+    #     f_int = self.get_internal_forces(disp_sys)
+    #     f_res = self.get_external_load(loadFactor) + self.get_internal_forces(disp_sys)
+    #     return f_res
+
+    def get_residual(self, loadFactor, disp_sys):
         f_int = self.get_internal_forces(disp_sys)
-        #f_res = self.get_external_load(loadFactor) + self.get_internal_forces(disp_sys) #replaced + with -
-        f_res = self.get_external_load(loadFactor) - self.get_internal_forces(disp_sys) # 1 channge here replaced + with -
+        f_ext = self.get_external_load(loadFactor)
+        #jeg tror external er riktig men det er problem med internal
+        f_res = f_ext - f_int
+
+        # Set boundary conditions reaction forces to zero
+        for idof in range(len(self.bc)):
+            idx = self.bc[idof] - 1
+            f_res[idx]   = 0.0
+
         return f_res
 
     def append_solution(self, loadFactor, disp_sys):
@@ -300,8 +273,6 @@ class CantileverWithEndMoment(BeamModel):
         #self.inc_load[-1] = 1.0e6
         self.inc_load[-1] = MomentFullCircle
         self.plotDof = self.num_dofs - 1 # Setting which dof for the Load-disp curve: y disp of last node
-
-
 
 
 
