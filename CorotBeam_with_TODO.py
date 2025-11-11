@@ -104,6 +104,32 @@ def beam2corot_Ke_and_Fe(ex, ey, ep, disp_global):
     displ_local[3] = delta_L * 0.5
 
     Ke_local = beam2local_stiff(L0,ep)
+
+    #f_int_local = Ke_local @ displ_local
+    # --- Geometrisk stivhet (lokal), basert på DEFORMERT lengde ---
+    # Deformert lengde Ld via de deformer­te nodale koordinatene (ex_def, ey_def)
+    Ld = float(np.hypot(ex_def[1] - ex_def[0], ey_def[1] - ey_def[0]))
+    if Ld == 0.0:
+        Ld = L0  # fallback
+
+    E, A, I = ep
+
+    # Aksialkraft i lokal akse (liten tøyning, store rotasjoner – korotasjon)
+    N = E * A * (Ld - L0) / L0
+
+    # Konsistent geometrisk stivhet for 2D ramme (Euler–Bernoulli) i lokal basis
+    coeff = N / (30.0 * Ld)
+    Kg_local = coeff * np.array([
+        [0.0,    0.0,        0.0,   0.0,     0.0,         0.0],
+        [0.0,   36.0,    3.0*Ld,   0.0,   -36.0,     3.0*Ld],
+        [0.0, 3.0*Ld,  4.0*Ld*Ld,  0.0,  -3.0*Ld,  -1.0*Ld*Ld],
+        [0.0,    0.0,        0.0,   0.0,     0.0,         0.0],
+        [0.0,  -36.0,   -3.0*Ld,   0.0,    36.0,    -3.0*Ld],
+        [0.0, 3.0*Ld, -1.0*Ld*Ld,  0.0,  -3.0*Ld,   4.0*Ld*Ld]
+    ], dtype=float)
+
+    # Total lokal tangent
+    Kt_local = Ke_local + Kg_local 
     f_int_local = Ke_local @ displ_local
 
 
@@ -112,7 +138,7 @@ def beam2corot_Ke_and_Fe(ex, ey, ep, disp_global):
     T = beam2corot_Te(ex_def,ey_def)
 
     # Global stivhetsmatrise og interne krefter
-    Ke_global = T.T @ Ke_local @ T
+    Ke_global = T.T @ Kt_local @ T
     f_int_local = Ke_local @ displ_local
     fe_int_global = T.T @ f_int_local
 
@@ -207,3 +233,4 @@ def beam2e(ex, ey, ep, eq=None):
         return Ke
     else:
         return Ke, fe
+
