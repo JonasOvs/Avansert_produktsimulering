@@ -3,11 +3,12 @@ import SolverAlgorithms_with_TODO as algs
 
 num_nodes = 9
 #model = models.SimplySupportedBeamModel(num_nodes)
-model = models.CantileverWithEndMoment(num_nodes)
+#model = models.CantileverWithEndMoment(num_nodes)
+model = models.DeepArchModel(num_nodes)
 
 #algs.solveLinearSteps(model,load_steps=0.01,max_steps=100)
-algs.solveNonlinLoadControl(model,load_steps=0.01,max_steps=100)
-#algs.solveArchLength(model,load_steps=0.01,max_steps=100)
+#algs.solveNonlinLoadControl(model,load_steps=0.01,max_steps=100)
+algs.solveArchLength(model,load_steps=0.01,max_steps=100)
 
 num_steps = len(model.load_history)
 
@@ -25,3 +26,4 @@ for iStep in range(0,len(model.load_history), step_inc):
 for iStep in range(num_steps):
     model.vtu_print_state(iStep)
 print("End")
+
