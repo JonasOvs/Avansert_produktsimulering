@@ -277,7 +277,55 @@ class CantileverWithEndMoment(BeamModel):
 
 
 
+# This is an actual model
+class DeepArchModel(BeamModel):
 
+    def __init__(self, num_nodes):
+        BeamModel.__init__(self)
 
+        self.num_nodes = num_nodes
+        self.num_elements = num_nodes - 1
+        self.num_dofs = self.num_nodes * 3
+        b = 1.0
+        h = 10.0
+        R = 1000.0
+        L = 1600.0
+        self.E = 2.1e5
+        self.A = b * h
+        self.I = b * h**3 / 12.0
+        self.ep = np.array([self.E, self.A, self.I])
+
+        nominalLoad = self.E * self.I / R**2
+
+        self.L_total = 9.0
+
+        L_el = self.L_total / self.num_elements
+
+        self.coords = np.zeros((self.num_nodes,2)) # Coordinates for all the nodes
+        self.dispState = np.zeros(self.num_nodes*3)
+        self.Ndofs  = np.zeros((self.num_nodes,3)) # Dofs for all the nodes
+        alpha = math.asin((L/2.0) / R)
+        d_alpha = (2.0 * alpha) / (self.num_nodes -1)
+        for i in range(self.num_nodes):
+            a = -alpha + i*d_alpha
+            self.coords[i,0] = math.sin(a) * R #sin av vinkel * R
+            self.coords[i,1] = math.cos(a) * R #cos av vinkel * R
+            self.Ndofs[i,:] = np.array([1,2,3],dtype=int) + i*3
+
+        self.Edofs = np.zeros((self.num_elements,6),dtype=int) # Element dofs for all the elements
+        self.Enods = np.zeros((self.num_elements,2),dtype=int) # Element nodes for all the elements
+        for i in range(self.num_elements):
+            self.Edofs[i,:] = np.array([1,2,3,4,5,6],dtype=int) + 3*i
+            self.Enods[i,:] = np.array([1,2],dtype=int) + i
+
+        # Fix x and y at first node and y at last node
+        self.bc = np.array([1,2,(self.num_nodes*3 -2),(self.num_nodes*3 -1)],dtype=int)
+
+        # The external incremental load (linear scaling with lambda)
+        mid_node      = (self.num_nodes +1) // 2
+        mid_y_dof_idx = (mid_node-1) * 3 + 1
+        self.inc_load = np.zeros(self.num_dofs)
+        self.inc_load[mid_y_dof_idx] = -nominalLoad
+        self.plotDof = mid_y_dof_idx + 1
 
 
